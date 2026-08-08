@@ -2,7 +2,10 @@ import { GoogleGenAI, Chat, Type } from '@google/genai';
 import { Waifu, RelationshipMode, Message } from '../types';
 
 // Initialize the SDK. API_KEY must be provided in the environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY, vertexai: true });
+const ai = new GoogleGenAI({ 
+    apiKey: process.env.API_KEY, 
+    vertexai: { project: 'cube-arena-504913', location: 'us-central1' }
+});
 
 // Store a separate chat session for each waifu ID AND mode
 const chatSessions: Record<string, Chat> = {};
