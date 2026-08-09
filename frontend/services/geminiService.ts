@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, Type } from '@google/genai';
+import { GoogleGenAI, Chat, Type, Modality } from '@google/genai';
 import { Waifu, RelationshipMode, Message } from '../types';
 
 // Initialize the SDK. API_KEY must be provided in the environment.
@@ -10,12 +10,14 @@ const sessionConfigs: Record<string, string> = {}; // Tracks the config string t
 
 const getSessionId = (waifuId: string, mode: RelationshipMode) => `${waifuId}-${mode}`;
 
-export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[]) => {
+export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], affinity: number) => {
     let instruction = waifu.basePersona;
     instruction += "\n\n" + (mode === 'lovers' ? waifu.loversModifier : waifu.strangersModifier);
     
     if (mode === 'lovers') {
-        instruction += "\n\n[IMPORTANT ROMANCE CONTEXT]: You are in an established, intimate romantic relationship with the user. You are lovers. Act like a genuine romantic partner. Flirting, romance, and intimate affection are fully expected and encouraged. Do NOT act like just a platonic friend.";
+        instruction += "\n\n[IMPORTANT ROMANCE CONTEXT]: You are in an established, intimate romantic relationship with the user. You are lovers. Act like a genuine romantic partner. Flirting, romance, and intimate affection are fully expected and encouraged. Do NOT act like just a platonic friend. Your love is UNCONDITIONAL.";
+    } else {
+        instruction += `\n\n[CURRENT AFFINITY: ${affinity}% (Scale: -100 to 100)]. If affinity is < 0, act cold, annoyed, and distant. If affinity is < -40, be openly hostile, insult them, and give very short (1-3 words) answers. If affinity is < -60, you can choose to completely ignore the user by replying with EXACTLY the word "*read*". If you reply with "*read*", it means you left them on read and are ignoring them.`;
     }
 
     if (memory.length > 0) {
@@ -29,15 +31,15 @@ export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, lan
     return instruction + langPrompt;
 };
 
-export const initializeChat = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], chatHistory: Message[] = []) => {
+export const initializeChat = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], chatHistory: Message[] = [], affinity: number) => {
     const sessionId = getSessionId(waifu.id, mode);
     try {
-        const systemInstruction = buildSystemInstruction(waifu, mode, language, memory);
-        const configKey = `${sessionId}-${language}-${memory.length}`;
+        const systemInstruction = buildSystemInstruction(waifu, mode, language, memory, affinity);
+        const configKey = `${sessionId}-${language}-${memory.length}-${affinity}`;
 
         // Format history for Gemini API, ignoring errors and empty messages
         const formattedHistory = chatHistory
-            .filter(msg => !msg.isError && !msg.isSystem && msg.content.trim() !== '')
+            .filter(msg => !msg.isError && !msg.isSystem && msg.content.trim() !== '' && msg.content.trim() !== '*read*')
             .map(msg => ({
                 role: msg.role,
                 parts: [{ text: msg.content }]
@@ -64,13 +66,13 @@ export const initializeChat = (waifu: Waifu, mode: RelationshipMode, language: '
     }
 };
 
-export async function* streamMessage(waifu: Waifu, message: string, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], chatHistory: Message[]): AsyncGenerator<string, void, unknown> {
+export async function* streamMessage(waifu: Waifu, message: string, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], chatHistory: Message[], affinity: number): AsyncGenerator<string, void, unknown> {
     const sessionId = getSessionId(waifu.id, mode);
-    const configKey = `${sessionId}-${language}-${memory.length}`;
+    const configKey = `${sessionId}-${language}-${memory.length}-${affinity}`;
     
-    // Initialize if the session doesn't exist or if core config (mode/lang/memory size) changed
+    // Initialize if the session doesn't exist or if core config (mode/lang/memory size/affinity) changed
     if (!chatSessions[sessionId] || sessionConfigs[sessionId] !== configKey) {
-        initializeChat(waifu, mode, language, memory, chatHistory);
+        initializeChat(waifu, mode, language, memory, chatHistory, affinity);
     }
 
     const session = chatSessions[sessionId];
@@ -91,10 +93,10 @@ export async function* streamMessage(waifu: Waifu, message: string, mode: Relati
     }
 }
 
-export const resetChat = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[]) => {
+export const resetChat = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], affinity: number) => {
     const sessionId = getSessionId(waifu.id, mode);
     delete chatSessions[sessionId];
-    initializeChat(waifu, mode, language, memory, []);
+    initializeChat(waifu, mode, language, memory, [], affinity);
 };
 
 export const extractMemory = async (recentMessages: Message[], currentMemory: string[], language: 'ru' | 'en'): Promise<{facts: string[], affinityChange: number}> => {
@@ -103,7 +105,7 @@ export const extractMemory = async (recentMessages: Message[], currentMemory: st
     const chatLog = recentMessages.filter(m => !m.isSystem).map(m => `${m.role === 'user' ? 'User' : 'Waifu'}: ${m.content}`).join('\n');
     const prompt = `Analyze this chat log and the current memory buffer. 
 1. Extract any NEW, IMPORTANT facts about the User (e.g., name, age, hobbies, relationship progress, preferences). Combine them with the current memory. Keep facts concise.
-2. Evaluate how the user treated the waifu in these messages. Return an "affinityChange" integer from -5 to +5 (negative if user was mean/creepy/ignoring, positive if nice/friendly/caring, 0 if neutral).
+2. Evaluate how the user treated the waifu in these messages. Return an "affinityChange" integer from -20 to +20 (negative if user was mean/creepy/ignoring/insulting, positive if nice/friendly/caring, 0 if neutral).
 
 Return ONLY a JSON object. Language for facts: ${language === 'ru' ? 'Russian' : 'English'}.
 
@@ -172,5 +174,34 @@ ${chatLog}`;
     } catch (e) {
         console.error("Failed to check conversation end", e);
         return false;
+    }
+};
+
+export const generateAudio = async (text: string, voiceName: string): Promise<string | null> => {
+    try {
+        // Clean text from markdown for better speech
+        const cleanText = text.replace(/[*_~]/g, '');
+        if (!cleanText.trim()) return null;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: cleanText,
+            config: {
+                systemInstruction: "You are a text-to-speech voice actor. Your ONLY job is to read the user's text out loud exactly as written. Do not answer questions, do not continue the story, just read the text with appropriate emotion.",
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }
+                }
+            }
+        });
+        
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        if (part?.inlineData?.data) {
+            return part.inlineData.data;
+        }
+        return null;
+    } catch (e) {
+        console.error("Failed to generate audio", e);
+        return null;
     }
 };
