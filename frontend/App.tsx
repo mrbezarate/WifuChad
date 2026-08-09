@@ -6,7 +6,9 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { WaifuSelector } from './components/WaifuSelector';
 import { MemoryPanel } from './components/MemoryPanel';
-import { streamMessage, resetChat, extractMemory } from './services/geminiService';
+import { streamMessage, resetChat, extractMemory, checkConversationEnd } from './services/geminiService';
+
+type ConvStatus = 'active' | 'ended' | 'morning_sent';
 
 export default function App() {
     const [language, setLanguage] = useState<'ru' | 'en'>('ru');
@@ -18,30 +20,36 @@ export default function App() {
     
     // State keyed by sessionId: `${waifu.id}-${mode}`
     const [isTyping, setIsTyping] = useState<Record<string, boolean>>({});
+    const [inputValues, setInputValues] = useState<Record<string, string>>({});
     const [nudgeCounts, setNudgeCounts] = useState<Record<string, number>>({});
     const [chatHistories, setChatHistories] = useState<Record<string, Message[]>>({});
     const [memories, setMemories] = useState<Record<string, string[]>>({});
+    const [affinityScores, setAffinityScores] = useState<Record<string, number>>({});
+    const [convStatus, setConvStatus] = useState<Record<string, ConvStatus>>({});
     
     // Unread counts are still keyed by waifu.id for the sidebar
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+    const morningTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
     
     const activeWaifuRef = useRef(activeWaifu);
     const modeRef = useRef(mode);
+    const languageRef = useRef(language);
+    const chatHistoriesRef = useRef(chatHistories);
+    const memoriesRef = useRef(memories);
 
-    useEffect(() => {
-        activeWaifuRef.current = activeWaifu;
-    }, [activeWaifu]);
-
-    useEffect(() => {
-        modeRef.current = mode;
-    }, [mode]);
+    useEffect(() => { activeWaifuRef.current = activeWaifu; }, [activeWaifu]);
+    useEffect(() => { modeRef.current = mode; }, [mode]);
+    useEffect(() => { languageRef.current = language; }, [language]);
+    useEffect(() => { chatHistoriesRef.current = chatHistories; }, [chatHistories]);
+    useEffect(() => { memoriesRef.current = memories; }, [memories]);
 
     const activeSessionId = `${activeWaifu.id}-${mode}`;
     const currentMessages = chatHistories[activeSessionId] || [];
     const currentMemory = memories[activeSessionId] || [];
+    const currentAffinity = affinityScores[activeSessionId] ?? (mode === 'lovers' ? 100 : 0);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,8 +68,125 @@ export default function App() {
 
     const handleModeToggle = () => {
         setMode(prev => prev === 'lovers' ? 'strangers' : 'lovers');
-        // We no longer reset the chat here! The state will naturally switch to the other session's history.
     };
+
+    const triggerMorningGreeting = useCallback(async (sId: string) => {
+        const [waifuId, sessionMode] = sId.split('-');
+        const waifu = WAIFUS.find(w => w.id === waifuId)!;
+        const currentMode = sessionMode as RelationshipMode;
+        const lang = languageRef.current;
+        
+        // Generate random time between 6:00 and 10:00
+        const hour = Math.floor(Math.random() * 5) + 6;
+        const minute = Math.floor(Math.random() * 60);
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        
+        const systemMsgId = Date.now().toString();
+        const systemMessage: Message = {
+            id: systemMsgId,
+            role: 'model',
+            content: lang === 'ru' 
+                ? `Наступил следующий день. Время: ${timeString}`
+                : `The next day has started. Time: ${timeString} AM`,
+            isSystem: true
+        };
+
+        setNudgeCounts(prev => ({ ...prev, [sId]: 0 }));
+        setChatHistories(prev => ({
+            ...prev,
+            [sId]: [...(prev[sId] || []), systemMessage]
+        }));
+        
+        // Small delay before she starts typing
+        setTimeout(async () => {
+            const botMessageId = (Date.now() + 1).toString();
+            const initialBotMessage: Message = {
+                id: botMessageId,
+                role: 'model',
+                content: '',
+                isStreaming: true,
+            };
+
+            setChatHistories(prev => ({
+                ...prev,
+                [sId]: [...(prev[sId] || []), initialBotMessage]
+            }));
+            setIsTyping(prev => ({ ...prev, [sId]: true }));
+
+            const isActiveSession = activeWaifuRef.current.id === waifu.id && modeRef.current === currentMode;
+            if (!isActiveSession) {
+                setUnreadCounts(prev => ({ ...prev, [waifu.id]: (prev[waifu.id] || 0) + 1 }));
+            }
+
+            try {
+                const prompt = lang === 'ru' 
+                    ? `(Система: Наступил новый день, сейчас ${timeString} утра. Поздоровайся с пользователем с добрым утром, учитывая ваши текущие отношения и прошлый разговор. Напиши первым.)`
+                    : `(System: A new day has started, it is now ${timeString} AM. Greet the user good morning based on your current relationship and past conversation. You are initiating the conversation.)`;
+                
+                const stream = streamMessage(waifu, prompt, currentMode, lang, memoriesRef.current[sId] || [], chatHistoriesRef.current[sId] || []);
+                
+                for await (const chunk of stream) {
+                    setChatHistories(prev => {
+                        const history = prev[sId] || [];
+                        return {
+                            ...prev,
+                            [sId]: history.map(msg => 
+                                msg.id === botMessageId 
+                                    ? { ...msg, content: msg.content + chunk }
+                                    : msg
+                            )
+                        };
+                    });
+                }
+            } catch (error: any) {
+                setChatHistories(prev => {
+                    const history = prev[sId] || [];
+                    return {
+                        ...prev,
+                        [sId]: history.map(msg => 
+                            msg.id === botMessageId 
+                                ? { ...msg, content: "...", isError: true }
+                                : msg
+                        )
+                    };
+                });
+            } finally {
+                setIsTyping(prev => ({ ...prev, [sId]: false }));
+                setChatHistories(prev => {
+                    const history = prev[sId] || [];
+                    return {
+                        ...prev,
+                        [sId]: history.map(msg => 
+                            msg.id === botMessageId 
+                                ? { ...msg, isStreaming: false }
+                                : msg
+                        )
+                    };
+                });
+                setConvStatus(prev => ({ ...prev, [sId]: 'morning_sent' }));
+            }
+        }, 1500);
+    }, []);
+
+    // Handle automatic morning greeting when conversation ends
+    useEffect(() => {
+        Object.entries(convStatus).forEach(([sId, status]) => {
+            if (status === 'ended') {
+                if (!morningTimersRef.current[sId]) {
+                    // Simulate night passing (10 seconds for demonstration)
+                    morningTimersRef.current[sId] = setTimeout(() => {
+                        triggerMorningGreeting(sId);
+                        delete morningTimersRef.current[sId];
+                    }, 10000);
+                }
+            } else {
+                if (morningTimersRef.current[sId]) {
+                    clearTimeout(morningTimersRef.current[sId]);
+                    delete morningTimersRef.current[sId];
+                }
+            }
+        });
+    }, [convStatus, triggerMorningGreeting]);
 
     const triggerNudge = useCallback(async (waifu: Waifu, nudgeMode: RelationshipMode, currentNudgeCount: number, lang: 'ru' | 'en', memory: string[], currentHistory: Message[]) => {
         const sId = `${waifu.id}-${nudgeMode}`;
@@ -152,8 +277,11 @@ export default function App() {
                 const typing = isTyping[sId];
                 const nudgeCount = nudgeCounts[sId] || 0;
                 const memory = memories[sId] || [];
+                const isUserTyping = (inputValues[sId] || '').trim().length > 0;
+                const status = convStatus[sId] || 'active';
 
-                if (!typing && lastMessage && lastMessage.role === 'model' && !lastMessage.isError && nudgeCount < 3) {
+                // Only start timer if last message is from model, bot is not typing, user is NOT typing, under nudge limit, and conversation is ACTIVE
+                if (!typing && lastMessage && lastMessage.role === 'model' && !lastMessage.isError && nudgeCount < 3 && !isUserTyping && status === 'active') {
                     if (!timers[sId]) {
                         let delay = 60000;
                         if (nudgeCount === 0) delay = Math.floor(Math.random() * 60000) + 60000; // 1-2 min
@@ -173,11 +301,12 @@ export default function App() {
                 }
             });
         });
-    }, [chatHistories, isTyping, nudgeCounts, language, memories, triggerNudge]);
+    }, [chatHistories, isTyping, nudgeCounts, language, memories, inputValues, convStatus, triggerNudge]);
 
     useEffect(() => {
         return () => {
             Object.values(timersRef.current).forEach(clearTimeout);
+            Object.values(morningTimersRef.current).forEach(clearTimeout);
         };
     }, []);
 
@@ -198,6 +327,7 @@ export default function App() {
         };
 
         setNudgeCounts(prev => ({ ...prev, [sId]: 0 }));
+        setConvStatus(prev => ({ ...prev, [sId]: 'active' }));
 
         const currentHistory = chatHistories[sId] || [];
         const updatedHistory = [...currentHistory, userMessage, initialBotMessage];
@@ -222,11 +352,25 @@ export default function App() {
                 });
             }
 
+            // Check if conversation ended naturally
+            const finalHistory = chatHistoriesRef.current[sId] || [];
+            checkConversationEnd(finalHistory).then(isEnded => {
+                if (isEnded) {
+                    setConvStatus(prev => ({ ...prev, [sId]: 'ended' }));
+                }
+            });
+
             // Memory Extraction Logic: Run every 4 user messages
             const userMsgCount = updatedHistory.filter(m => m.role === 'user').length;
             if (userMsgCount > 0 && userMsgCount % 4 === 0) {
-                extractMemory(updatedHistory.slice(-8), memories[sId] || [], language).then(newMemories => {
-                    setMemories(prev => ({ ...prev, [sId]: newMemories }));
+                extractMemory(updatedHistory.slice(-8), memories[sId] || [], language).then(result => {
+                    setMemories(prev => ({ ...prev, [sId]: result.facts }));
+                    if (result.affinityChange !== 0) {
+                        setAffinityScores(prev => {
+                            const current = prev[sId] ?? (mode === 'lovers' ? 100 : 0);
+                            return { ...prev, [sId]: Math.min(100, Math.max(0, current + result.affinityChange)) };
+                        });
+                    }
                 });
             }
 
@@ -263,6 +407,8 @@ export default function App() {
         setChatHistories(prev => ({ ...prev, [activeSessionId]: [] }));
         setNudgeCounts(prev => ({ ...prev, [activeSessionId]: 0 }));
         setUnreadCounts(prev => ({ ...prev, [activeWaifu.id]: 0 }));
+        setAffinityScores(prev => ({ ...prev, [activeSessionId]: mode === 'lovers' ? 100 : 0 }));
+        setConvStatus(prev => ({ ...prev, [activeSessionId]: 'active' }));
     };
 
     return (
@@ -313,7 +459,13 @@ export default function App() {
                                 {activeWaifu.name}
                                 <Sparkles size={14} className="text-kawaii-400 flex-shrink-0" />
                             </h1>
-                            <p className="text-kawaii-500 text-xs font-bold truncate">{activeWaifu.anime}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-kawaii-500 text-xs font-bold truncate">{activeWaifu.anime}</p>
+                                <div className="flex items-center gap-1 text-pink-500 text-[10px] font-bold bg-pink-50 px-1.5 py-0.5 rounded-full border border-pink-100">
+                                    <Heart size={10} className={currentAffinity > 50 ? "fill-pink-500" : ""} /> 
+                                    {currentAffinity}%
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -397,6 +549,8 @@ export default function App() {
 
                 {/* Input Area */}
                 <ChatInput 
+                    value={inputValues[activeSessionId] || ''}
+                    onChange={(val) => setInputValues(prev => ({ ...prev, [activeSessionId]: val }))}
                     onSendMessage={handleSendMessage} 
                     disabled={isTyping[activeSessionId] || false}
                     activeWaifu={activeWaifu}
