@@ -1,16 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Send, Loader2, Sparkles } from 'lucide-react';
 import { Waifu } from '../types';
 
 interface ChatInputProps {
+    value: string;
+    onChange: (value: string) => void;
     onSendMessage: (message: string) => void;
     disabled: boolean;
     activeWaifu: Waifu;
     language: 'ru' | 'en';
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, activeWaifu, language }) => {
-    const [input, setInput] = useState('');
+export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSendMessage, disabled, activeWaifu, language }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Auto-resize textarea
@@ -19,13 +20,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, a
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
         }
-    }, [input]);
+    }, [value]);
 
     const handleSend = () => {
-        const trimmed = input.trim();
+        const trimmed = value.trim();
         if (trimmed && !disabled) {
             onSendMessage(trimmed);
-            setInput('');
+            onChange('');
             if (textareaRef.current) {
                 textareaRef.current.style.height = 'auto';
             }
@@ -47,8 +48,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, a
                 </div>
                 <textarea
                     ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={language === 'ru' ? `Написать ${activeWaifu.name}...` : `Say something to ${activeWaifu.name}...`}
                     disabled={disabled}
@@ -57,9 +58,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, a
                 />
                 <button
                     onClick={handleSend}
-                    disabled={disabled || !input.trim()}
+                    disabled={disabled || !value.trim()}
                     className={`p-3.5 rounded-2xl flex-shrink-0 transition-all duration-300 shadow-sm
-                        ${input.trim() && !disabled 
+                        ${value.trim() && !disabled 
                             ? `${activeWaifu.themeColor} text-white hover:scale-105 hover:shadow-md` 
                             : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
                     aria-label="Send message"
