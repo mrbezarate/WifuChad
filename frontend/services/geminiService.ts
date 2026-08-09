@@ -29,8 +29,8 @@ export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, lan
     }
 
     const langPrompt = language === 'ru' 
-        ? "\n\nCRITICAL: You MUST reply entirely in Russian language. Use natural, conversational Russian." 
-        : "\n\nCRITICAL: You MUST reply entirely in English language.";
+        ? "\n\nCRITICAL: You MUST reply entirely in Russian language. Use natural, conversational Russian. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat (1-3 short sentences max). Do not write huge paragraphs, monologues, or novel-like descriptions unless explicitly asked." 
+        : "\n\nCRITICAL: You MUST reply entirely in English language. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat (1-3 short sentences max). Do not write huge paragraphs, monologues, or novel-like descriptions unless explicitly asked.";
     
     return instruction + langPrompt;
 };
