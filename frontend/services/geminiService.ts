@@ -193,4 +193,5 @@ ${chatLog}`;
         console.error("Failed to check conversation end", e);
         return false;
     }
+};
 
