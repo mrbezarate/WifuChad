@@ -1,17 +1,10 @@
-let outputAudioContext: AudioContext | null = null;
-let outputNode: GainNode | null = null;
-const sources = new Set<AudioBufferSourceNode>();
-let nextStartTime = 0;
 let isMuted = false;
 
 export function initAudio() {
-    if (!outputAudioContext) {
-        outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
-        outputNode = outputAudioContext.createGain();
-        outputNode.connect(outputAudioContext.destination);
-    }
-    if (outputAudioContext.state === 'suspended') {
-        outputAudioContext.resume();
+    // No-op for Web Speech API, but kept for compatibility
+    if ('speechSynthesis' in window) {
+        // Just warm up the engine
+        window.speechSynthesis.getVoices();
     }
 }
 
@@ -20,58 +13,35 @@ export function setMuted(muted: boolean) {
     if (muted) stopAllAudio();
 }
 
-function decode(base64: string) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
+export function speakText(text: string, language: 'ru' | 'en') {
+    if (isMuted || !('speechSynthesis' in window)) return;
+    
+    // Stop any currently playing audio so they don't overlap awkwardly
+    stopAllAudio();
 
-async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language === 'ru' ? 'ru-RU' : 'en-US';
+    
+    // Try to find a female voice (often 'Google русский' or similar)
+    const voices = window.speechSynthesis.getVoices();
+    const targetLang = utterance.lang;
+    const voice = voices.find(v => v.lang === targetLang && (v.name.includes('Female') || v.name.includes('Google'))) 
+               || voices.find(v => v.lang === targetLang) 
+               || voices[0];
+               
+    if (voice) {
+        utterance.voice = voice;
     }
-    return buffer;
-}
+    
+    // Adjust pitch and rate to sound slightly more "anime/cute"
+    utterance.pitch = 1.3;
+    utterance.rate = 1.05;
 
-export async function playPcmBase64(base64EncodedAudioString: string) {
-    if (isMuted) return;
-    initAudio();
-    if (!outputAudioContext || !outputNode) return;
-
-    if (nextStartTime < outputAudioContext.currentTime) {
-        nextStartTime = outputAudioContext.currentTime;
-    }
-
-    try {
-        const audioBuffer = await decodeAudioData(decode(base64EncodedAudioString), outputAudioContext, 24000, 1);
-        const source = outputAudioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(outputNode);
-        source.addEventListener('ended', () => {
-            sources.delete(source);
-        });
-        source.start(nextStartTime);
-        nextStartTime = nextStartTime + audioBuffer.duration;
-        sources.add(source);
-    } catch (e) {
-        console.error("Failed to decode and play audio chunk", e);
-    }
+    window.speechSynthesis.speak(utterance);
 }
 
 export function stopAllAudio() {
-    for (const source of sources.values()) {
-        try { source.stop(); } catch (e) {}
-        sources.delete(source);
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
     }
-    nextStartTime = 0;
 }

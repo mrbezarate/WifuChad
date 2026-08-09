@@ -193,33 +193,4 @@ ${chatLog}`;
         console.error("Failed to check conversation end", e);
         return false;
     }
-};
 
-export const generateAudio = async (text: string, voiceName: string): Promise<string | null> => {
-    try {
-        // Clean text from markdown for better speech
-        const cleanText = text.replace(/[*_~]/g, '');
-        if (!cleanText.trim()) return null;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: cleanText,
-            config: {
-                systemInstruction: "You are a text-to-speech voice actor. Your ONLY job is to read the user's text out loud exactly as written. Do not answer questions, do not continue the story, just read the text with appropriate emotion.",
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } }
-                }
-            }
-        });
-        
-        const part = response.candidates?.[0]?.content?.parts?.[0];
-        if (part?.inlineData?.data) {
-            return part.inlineData.data;
-        }
-        return null;
-    } catch (e) {
-        console.error("Failed to generate audio", e);
-        return null;
-    }
-};

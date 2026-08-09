@@ -6,8 +6,8 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { WaifuSelector } from './components/WaifuSelector';
 import { MemoryPanel } from './components/MemoryPanel';
-import { streamMessage, resetChat, extractMemory, checkConversationEnd, generateAudio } from './services/geminiService';
-import { playPcmBase64, stopAllAudio, setMuted, initAudio } from './services/audioService';
+import { streamMessage, resetChat, extractMemory, checkConversationEnd } from './services/geminiService';
+import { speakText, stopAllAudio, setMuted, initAudio } from './services/audioService';
 
 type ConvStatus = 'active' | 'ended' | 'morning_sent';
 
@@ -155,9 +155,7 @@ export default function App() {
                     });
                 }
                 if (isVoiceEnabled && fullResponse.trim() !== '*read*') {
-                    generateAudio(fullResponse, waifu.voiceName).then(base64 => {
-                        if (base64) playPcmBase64(base64);
-                    });
+                    speakText(fullResponse, lang);
                 }
             } catch (error: any) {
                 setChatHistories(prev => {
@@ -272,9 +270,7 @@ export default function App() {
                 });
             }
             if (isVoiceEnabled && fullResponse.trim() !== '*read*') {
-                generateAudio(fullResponse, waifu.voiceName).then(base64 => {
-                    if (base64) playPcmBase64(base64);
-                });
+                speakText(fullResponse, lang);
             }
         } catch (error: any) {
             setChatHistories(prev => {
@@ -398,9 +394,7 @@ export default function App() {
                 });
             }
             if (isVoiceEnabled && fullResponse.trim() !== '*read*') {
-                generateAudio(fullResponse, activeWaifu.voiceName).then(base64 => {
-                    if (base64) playPcmBase64(base64);
-                });
+                speakText(fullResponse, language);
             }
 
             // Check if conversation ended naturally
