@@ -29,8 +29,8 @@ export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, lan
     }
 
     const langPrompt = language === 'ru' 
-        ? "\n\nCRITICAL: You MUST reply entirely in Russian language. Use natural, conversational Russian. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat. If you need to explain something or describe an action, do it briefly and simply (1-3 sentences max). Avoid huge paragraphs and novel-like monologues." 
-        : "\n\nCRITICAL: You MUST reply entirely in English language. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat. If you need to explain something or describe an action, do it briefly and simply (1-3 sentences max). Avoid huge paragraphs and novel-like monologues.";
+        ? "\n\nCRITICAL: You MUST reply entirely in Russian language. Use natural, conversational Russian. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat. If you need to explain something or describe an action, do it briefly and simply (1-3 sentences max). Avoid huge paragraphs and novel-like monologues. ALWAYS stay in character and maintain your unique personality and speaking style." 
+        : "\n\nCRITICAL: You MUST reply entirely in English language. IMPORTANT: Keep your messages short, concise, and natural for a real-time chat. If you need to explain something or describe an action, do it briefly and simply (1-3 sentences max). Avoid huge paragraphs and novel-like monologues. ALWAYS stay in character and maintain your unique personality and speaking style.";
     
     return instruction + langPrompt;
 };
