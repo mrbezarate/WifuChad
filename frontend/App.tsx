@@ -404,16 +404,22 @@ export default function App() {
             }
 
             // Check if conversation ended naturally
+            // Cost Optimization: Regex Guard to avoid unnecessary AI calls
             const finalHistory = chatHistoriesRef.current[sId] || [];
-            checkConversationEnd(finalHistory).then(isEnded => {
-                if (isEnded) {
-                    setConvStatus(prev => ({ ...prev, [sId]: 'ended' }));
-                }
-            });
+            const userTextLower = content.toLowerCase();
+            const exitRegex = /(пока|спокойной ночи|до завтра|bye|good night|goodbye|see you|cya|отбой|спать)/i;
+            
+            if (exitRegex.test(userTextLower)) {
+                checkConversationEnd(finalHistory).then(isEnded => {
+                    if (isEnded) {
+                        setConvStatus(prev => ({ ...prev, [sId]: 'ended' }));
+                    }
+                });
+            }
 
-            // Memory Extraction Logic: Run every 2 user messages for faster affinity updates
+            // Memory Extraction Logic: Run every 6 user messages (Cost Optimization)
             const userMsgCount = updatedHistory.filter(m => m.role === 'user').length;
-            if (userMsgCount > 0 && userMsgCount % 2 === 0) {
+            if (userMsgCount > 0 && userMsgCount % 6 === 0) {
                 extractMemory(updatedHistory.slice(-6), memories[sId] || [], language).then(result => {
                     setMemories(prev => ({ ...prev, [sId]: result.facts }));
                     if (result.affinityChange !== 0 && mode === 'strangers') {

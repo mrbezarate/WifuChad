@@ -1,8 +1,12 @@
 import { GoogleGenAI, Chat, Type, Modality } from '@google/genai';
 import { Waifu, RelationshipMode, Message } from '../types';
+import { DoorkeeperFilter, paceMemoryContext } from './memoryOptimizer';
 
 // Initialize the SDK. API_KEY must be provided in the environment.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY, vertexai: true });
+
+// Global instance of the memory doorkeeper to filter out noise
+const memoryDoorkeeper = new DoorkeeperFilter(100);
 
 // Store a separate chat session for each waifu ID AND mode
 const chatSessions: Record<string, Chat> = {};
@@ -34,21 +38,26 @@ export const buildSystemInstruction = (waifu: Waifu, mode: RelationshipMode, lan
 export const initializeChat = (waifu: Waifu, mode: RelationshipMode, language: 'ru' | 'en', memory: string[], chatHistory: Message[] = [], affinity: number) => {
     const sessionId = getSessionId(waifu.id, mode);
     try {
-        const systemInstruction = buildSystemInstruction(waifu, mode, language, memory, affinity);
         const configKey = `${sessionId}-${language}-${memory.length}-${affinity}`;
 
         // Format history for Gemini API, ignoring errors and empty messages
+        // Cost Optimization: Sliding Window - limit to last 20 messages
         const formattedHistory = chatHistory
             .filter(msg => !msg.isError && !msg.isSystem && msg.content.trim() !== '' && msg.content.trim() !== '*read*')
             .map(msg => ({
                 role: msg.role,
                 parts: [{ text: msg.content }]
-            }));
+            }))
+            .slice(-20);
+
+        // Apply BBR Pacing to the memory buffer to prevent context bufferbloat
+        const pacedMemory = paceMemoryContext(memory, formattedHistory.length);
+        const dynamicSystemInstruction = buildSystemInstruction(waifu, mode, language, pacedMemory, affinity);
 
         const chatParams: any = {
             model: 'gemini-2.5-flash',
             config: {
-                systemInstruction: systemInstruction,
+                systemInstruction: dynamicSystemInstruction,
                 temperature: 0.7,
             }
         };
@@ -116,7 +125,7 @@ ${chatLog}`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
@@ -134,11 +143,20 @@ ${chatLog}`;
                 }
             }
         });
-        const data = JSON.parse(response.text);
-        return { 
-            facts: data.facts || currentMemory, 
-            affinityChange: data.affinityChange || 0 
-        };
+        let result = JSON.parse(response.text);
+        
+        // Filter new facts through the Doorkeeper to eliminate long-tail noise
+        if (result.facts && Array.isArray(result.facts)) {
+            const admittedFacts = result.facts.filter((fact: string) => memoryDoorkeeper.shouldAdmit(fact));
+            
+            // Merge with current memory and deduplicate
+            const mergedMemory = Array.from(new Set([...currentMemory, ...admittedFacts]));
+            result.facts = mergedMemory;
+        } else {
+            result.facts = currentMemory;
+        }
+
+        return result;
     } catch (e) {
         console.error("Memory extraction failed", e);
         return { facts: currentMemory, affinityChange: 0 };
@@ -157,7 +175,7 @@ ${chatLog}`;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
