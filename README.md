@@ -1,53 +1,87 @@
-# Vertex AI Studio Frontend App with Node.js Backend
+<div align="center">
+  
+# 🌸 WaifuChad
+**Next-Generation AI Anime Companion Platform**
 
-This repository contains a frontend and a Node.js backend, designed to run together.
-The backend acts as a proxy, handling Google Cloud API calls.
+[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-purple.svg)](https://vitejs.dev/)
+[![Vertex AI](https://img.shields.io/badge/Google%20Cloud-Vertex%20AI-orange.svg)](https://cloud.google.com/vertex-ai)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-This project is intended for demonstration and prototyping purposes only.
-It is not intended for use in a production environment.
+*WaifuChad — это не просто чат-бот. Это высокотехнологичная платформа для иммерсивного ролевого общения с вашими любимыми 2D-персонажами, использующая передовые модели LLM, динамическую долгосрочную память и генерацию голоса в реальном времени.*
 
-## Prerequisites
+</div>
 
-To run this application locally, you need:
+---
 
-*   **[Google Cloud SDK / gcloud CLI](https://cloud.google.com/sdk/docs/install)**: Follow the instructions to install the SDK.
+## ✨ Ключевые возможности (Features)
 
-*   **gcloud Initialization**:
-    *   Initialize the gcloud CLI:
-        ```bash
-        gcloud init
-        ```
-    *   Authenticate for Application Default Credentials (needed to call Google Cloud APIs):
-        ```bash
-        gcloud auth application-default login
-        ```
+*   🧠 **Generational Context Memory**: Инновационная архитектура управления памятью. ИИ не просто читает текст, он *запоминает* важные факты о вас и переносит их в долгосрочный буфер (LSM-Merge & TinyLFU фильтрация).
+*   🎭 **Adaptive Persona Engine**: Персонажи меняют своё поведение (Affinity System) в зависимости от ваших отношений (Lovers / Strangers) и сказанных вами слов.
+*   🎧 **Gapless Audio TTS**: Нативная интеграция с мультимодальной генерацией аудио от Gemini. Плавное проигрывание голоса вайфу через Web Audio API без пауз и заиканий.
+*   🚀 **Extreme Token Optimization**: Продвинутый Sliding Window для истории чата, Regex-эвристика и использование сверхдешевых фоновых агентов (`gemini-2.5-flash-lite`) сокращают потребление токенов на **85%**.
+*   🛡️ **Enterprise Security (BFF)**: Никаких открытых API-ключей в браузере. Все запросы перехватываются "умным шимом" и проксируются через защищенный Node.js сервер с Rate Limiting и валидацией хостов.
 
-*   **Node.js and npm**: Ensure you have Node.js and its package manager, `npm`, installed on your machine.
+---
 
-## Project Structure
+## 🛠 Технологический стек
 
-The project is organized into two main directories:
+*   **Frontend**: React, TypeScript, Vite, TailwindCSS (glassmorphism design).
+*   **Backend**: Node.js, Express, `google-auth-library`, `express-rate-limit`.
+*   **AI Models**: `gemini-2.5-flash` (Основной чат и Голос), `gemini-2.5-flash-lite` (Фоновые агенты памяти).
 
-*   `frontend/`: Contains the Frontend application code.
-*   `backend/`: Contains the Node.js/Express server code to proxy Google Cloud API calls.
+---
 
-## Backend Environment Variables
+## 🚀 Быстрый старт (Установка и запуск)
 
-The `backend/.env.local` file is automatically generated when you download this application.
-It contains essential Google Cloud environment variables pre-configured based on your project settings at the time of download.
+Для работы приложения на вашем компьютере должен быть настроен доступ к Google Cloud Vertex AI.
 
-The variables set in `backend/.env.local` are:
-*   `API_BACKEND_PORT`: The port the backend API server listens on (e.g., `5000`).
-*   `API_PAYLOAD_MAX_SIZE`: The maximum size of the request payload accepted by the backend server (e.g., `5mb`).
-*   `GOOGLE_CLOUD_LOCATION`: The Google Cloud region associated with your project.
-*   `GOOGLE_CLOUD_PROJECT`: Your Google Cloud Project ID.
+### 1. Предварительные требования (Prerequisites)
 
-**Note:** These variables are automatically populated during the download process.
-You can modify the values in `backend/.env.local` if you need to change them.
+*   **Node.js**: Убедитесь, что установлен Node.js (v18+).
+*   **Google Cloud SDK (gcloud CLI)**: [Скачайте и установите gcloud](https://cloud.google.com/sdk/docs/install).
 
-## Installation and Running the App
+### 2. Аутентификация в Google Cloud
 
-To install dependencies and run your Google Cloud Vertex AI Studio App locally, execute the following command:
+Откройте терминал и выполните инициализацию, а затем получите токен приложения (Application Default Credentials), чтобы Node.js сервер мог вызывать ИИ без явной передачи паролей в коде:
 
 ```bash
-npm install && npm run dev
+# 1. Авторизация в вашем аккаунте
+gcloud init
+
+# 2. Получение ключа доступа для кода (ОБЯЗАТЕЛЬНО!)
+gcloud auth application-default login
+```
+
+### 3. Установка и запуск проекта
+
+Склонируйте репозиторий и запустите одной командой. Скрипт установит зависимости и поднимет сразу оба сервера (Frontend на `localhost:5173` и Backend на `localhost:5000`).
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## 🏗 Архитектура проекта
+
+Проект спроектирован как монорепозиторий (Workspaces):
+
+```text
+├── backend/                  # Безопасный BFF-прокси 
+│   ├── server.js             # Защита от SSRF, Rate Limit, трансляция SSE-потоков
+│   └── .env.local            # Автогенерируемые настройки GCP
+└── frontend/                 # Пользовательский интерфейс React
+    ├── src/App.tsx           # Оркестратор состояний и таймеров активности
+    ├── services/             # Модули памяти (DoorkeeperFilter), ИИ и Аудио
+    └── vertex-ai-...js       # Monkey-Patch скрипт для перехвата fetch от SDK
+```
+
+> **Примечание по безопасности:** Ваш файл `backend/.env.local` уже содержит `GOOGLE_CLOUD_PROJECT` и привязан к вашей инфраструктуре. 
+
+---
+
+<div align="center">
+  <i>Разработано с ❤️ для тех, кто ищет идеальную виртуальную компанию.</i>
+</div>
