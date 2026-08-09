@@ -20,6 +20,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, activeWaifu, 
         );
     }
 
+    // Handle the "left on read" mechanic
+    if (message.role === 'model' && message.content.trim() === '*read*') {
+        return (
+            <div className="flex w-full justify-end mb-2 pr-14 -mt-4">
+                <span className="text-[10px] font-bold text-slate-400 italic">
+                    {language === 'ru' ? 'Прочитано' : 'Read'}
+                </span>
+            </div>
+        );
+    }
+
     const isUser = message.role === 'user';
 
     return (
