@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
       define: {
         // This is just generic value for the GEMINI API key.
         // This is not used at all, and can be ignored!
-        'process.env.API_KEY' : JSON.stringify('YOUR_API_KEY_HERE'),
+        'process.env.API_KEY' : JSON.stringify('api-key-this-is-not-used-can-be-ignored!'),
       },
       server: {
         proxy: {
