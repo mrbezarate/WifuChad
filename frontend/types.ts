@@ -4,6 +4,7 @@ export interface Message {
     content: string;
     isStreaming?: boolean;
     isError?: boolean;
+    isSystem?: boolean;
 }
 
 export interface ChatState {
