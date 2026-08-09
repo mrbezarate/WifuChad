@@ -10,6 +10,16 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, activeWaifu, language }) => {
+    if (message.isSystem) {
+        return (
+            <div className="flex w-full justify-center mb-6">
+                <div className="bg-slate-100/80 px-4 py-1.5 rounded-full border border-slate-200 text-xs font-bold text-slate-400 shadow-sm">
+                    {message.content}
+                </div>
+            </div>
+        );
+    }
+
     const isUser = message.role === 'user';
 
     return (
