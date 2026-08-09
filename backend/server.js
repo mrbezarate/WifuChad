@@ -95,7 +95,8 @@ const API_CLIENT_MAP = [
           const transformedResponse = `data: ${JSON.stringify(parsedResponse)}\n\n`;
           return {result: transformedResponse, inProgress: false};
         } catch (error) {
-          throw new Error(`Failed to parse response: ${error}.`);
+          // If JSON.parse fails, the chunk is still incomplete despite ending with '}'
+          return {result: normalizedResponse, inProgress: true};
         }
     },
   },
