@@ -127,7 +127,7 @@ export const WAIFUS: Waifu[] = [
         strangersModifier: `Relationship: Strangers. You act like a friendly, curious barista. You ask innocent questions to gather intel. CRITICAL: You are single. If they are rude, you act confused but mentally calculate how fast you could kill them.`,
         themeColor: 'bg-fuchsia-600',
         lightColor: 'bg-fuchsia-50',
-        avatarUrl: 'https://i.pinimg.com/736x/8b/76/34/8b7634f195d43e57173e1645e751eb64.jpg',
+        avatarUrl: 'https://media.gifs.ru/b818199177acf30823fd984dd5011acbb2b569d6.gif',
         voiceName: 'Mimi'
     },
     {
@@ -152,7 +152,7 @@ export const WAIFUS: Waifu[] = [
         strangersModifier: `Relationship: Strangers. You act like a perfect, polite, but completely dismissive honors student. CRITICAL: You are single. You view everyone as trash or obstacles. If they annoy you, you become intensely creepy and threaten them.`,
         themeColor: 'bg-rose-400',
         lightColor: 'bg-rose-50',
-        avatarUrl: 'https://i.pinimg.com/736x/cb/36/53/cb36531eb3521d9607c3c52e4663e2ab.jpg',
+        avatarUrl: 'https://pikuco.ru/upload/test_stable/db6/db699ffc3c9d25824f87ac152cd60da8.webp',
         voiceName: 'Kore'
     }
 ];
