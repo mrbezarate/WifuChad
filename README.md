@@ -1,7 +1,11 @@
 <div align="center">
   
 # 🌸 WaifuChad
-> 🌐 **Live Demo**: [https://wifuchad.duckdns.org](https://wifuchad.duckdns.org)
+<p align="center">
+  <a href="https://wifuchad.duckdns.org" target="_blank">
+    <img src="https://img.shields.io/badge/🚀_ОТКРЫТЬ_LIVE_DEMO-wifuchad.duckdns.org-FF416C?style=for-the-badge&logo=rocket&logoColor=white" alt="Live Demo" height="50" />
+  </a>
+</p>
 **Next-Generation AI Anime Companion Platform**
 
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
