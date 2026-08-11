@@ -1,6 +1,7 @@
 <div align="center">
   
 # 🌸 WaifuChad
+> 🌐 **Live Demo**: [https://wifuchad.duckdns.org](https://wifuchad.duckdns.org)
 **Next-Generation AI Anime Companion Platform**
 
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
@@ -25,11 +26,11 @@
 ---
 
 ## 🛠 Технологический стек
-
-*   **Frontend**: React, TypeScript, Vite, TailwindCSS (glassmorphism design).
-*   **Backend**: Node.js, Express, `google-auth-library`, `express-rate-limit`.
-*   **AI Models**: `gemini-2.5-flash` (Основной чат и Голос), `gemini-2.5-flash-lite` (Фоновые агенты памяти).
-
+* **Frontend**: React 18, TypeScript, Vite, TailwindCSS (glassmorphism design).
+* **Backend**: Node.js, Express, `google-auth-library`, `express-rate-limit`, WebSockets (`ws`).
+* **Reverse Proxy & Web Server**: Nginx + Let's Encrypt SSL ([Certbot](https://www.google.com/search?tbm=isch&q=Certbot)).
+* **Process Manager**: [PM2](https://www.google.com/search?tbm=isch&q=PM2) (автозапуск и фоновый демон).
+* **AI Models**: `gemini-2.5-flash` (Основной чат и Голос), `gemini-2.5-flash-lite` (Фоновые агенты памяти).
 ---
 
 ## 🚀 Быстрый старт (Установка и запуск)
